@@ -6,9 +6,9 @@ spring:
     name: kafka-UI
 
 kafka:
-  type: bootstrap_servers
-  bootstrap-servers: localhost:9092
-  zookeeper:
+  type: bootstrap_servers           # 支持支持指定  bootstrap-servers 和  zookeeper 的方式，默认：bootstrap_servers
+  bootstrap-servers: localhost:9092 # kafka bootstrap-servers
+  zookeeper:                        # 配置 type 为 zookeeper 时使用下面的配置
     host: localhost
     port: 2181
     session-timeout: 30s

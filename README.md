@@ -36,16 +36,19 @@ mkdir -p /usr/local/KafkaUILCC/config
 编写KafkaUILCC的配置文件
 
 ```bash
-vim /usr/local/KafkaUILCC/config/application.properties
+vim /usr/local/KafkaUILCC/config/application.yml
 ```
 
 文件内容如下：
 
-```bash
-# zookeeper_connect
-zookeeper.host=你的zookeeper连接地址
-zookeeper.port=你的zookeeper连接端口
-zookeeper.session_timeout=连接超时时间
+```yaml
+kafka:
+  type: bootstrap_servers           # 支持支持指定  bootstrap-servers 和  zookeeper 的方式，默认：bootstrap_servers
+  bootstrap-servers: localhost:9092 # kafka bootstrap-servers
+  zookeeper:                        # 配置 type 为 zookeeper 时使用下面的配置
+    host: localhost
+    port: 2181
+    session-timeout: 30s
 ```
 
 开启Kafka集群的JMX端口
