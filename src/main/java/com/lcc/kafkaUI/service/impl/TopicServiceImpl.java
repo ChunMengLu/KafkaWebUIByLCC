@@ -2,7 +2,7 @@ package com.lcc.kafkaUI.service.impl;
 
 import com.lcc.kafkaUI.common.utils.DataTransferUtil;
 import com.lcc.kafkaUI.common.utils.DateUtils;
-import com.lcc.kafkaUI.config.AdminClientConfig;
+import com.lcc.kafkaUI.config.KafkaProperties;
 import com.lcc.kafkaUI.dto.topic.TopicCreateDto;
 import com.lcc.kafkaUI.entity.ClusterNode;
 import com.lcc.kafkaUI.entity.Message;
@@ -25,12 +25,11 @@ import java.util.stream.Collectors;
 
 @Service
 public class TopicServiceImpl implements TopicService {
-
     @Autowired
     private AdminClient adminClient;
-
     @Autowired
-    private AdminClientConfig adminClientConfig;
+    private KafkaProperties kafkaProperties;
+
     @Override
     public List<Topic> getTopicList(boolean isInternal) {
         List<Topic> result = new ArrayList<>();
@@ -73,7 +72,7 @@ public class TopicServiceImpl implements TopicService {
 
         // 配置 Kafka Consumer
         Properties props = new Properties();
-        props.put("bootstrap.servers",adminClientConfig.getBootstrapServers());
+        props.put("bootstrap.servers", kafkaProperties.getBootstrapServers());
         props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         // 动态生成一个唯一的 group.id  这个Group肯定是要删除的

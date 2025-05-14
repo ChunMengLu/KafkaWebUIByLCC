@@ -1,7 +1,7 @@
 package com.lcc.kafkaUI.service.impl;
 
 import com.lcc.kafkaUI.common.utils.DataTransferUtil;
-import com.lcc.kafkaUI.config.AdminClientConfig;
+import com.lcc.kafkaUI.config.KafkaProperties;
 import com.lcc.kafkaUI.dto.ConsumerGroup.ConsumerGroupOffsetDto;
 import com.lcc.kafkaUI.entity.ConsumerGroup;
 import com.lcc.kafkaUI.entity.ConsumerGroupTopicPartition;
@@ -15,15 +15,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 
 @Service
 public class ConsumerGroupServiceImpl implements ConsumerGroupService {
-
     @Autowired
     private AdminClient adminClient;
     @Autowired
-    private AdminClientConfig adminClientConfig;
+    private KafkaProperties kafkaProperties;
 
     @Override
     public List<ConsumerGroup> getConsumerGroupList() {
@@ -61,7 +59,7 @@ public class ConsumerGroupServiceImpl implements ConsumerGroupService {
 
             // 为了获取每个分区的最新偏移量（Log End Offset），需要一个 KafkaConsumer 实例
             Properties consumerProps = new Properties();
-            consumerProps.put("bootstrap.servers",adminClientConfig.getBootstrapServers());
+            consumerProps.put("bootstrap.servers", kafkaProperties.getBootstrapServers());
             consumerProps.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
             consumerProps.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
             consumerProps.put("group.id", groupId);

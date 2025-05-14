@@ -1,24 +1,22 @@
 package com.lcc.kafkaUI.handler;
 
-import com.lcc.kafkaUI.config.AdminClientConfig;
+import com.lcc.kafkaUI.config.KafkaProperties;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
-import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
 public class WebSocketHandler extends TextWebSocketHandler {
@@ -26,7 +24,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
     @Autowired
     private AdminClient adminClient;
     @Autowired
-    private AdminClientConfig adminClientConfig;
+    private KafkaProperties kafkaProperties;
 
     // 创建线程池来管理消费者线程
     private final ExecutorService executorService = Executors.newFixedThreadPool(10);
@@ -57,13 +55,13 @@ public class WebSocketHandler extends TextWebSocketHandler {
         // 动态生成一个唯一的 group.id
         String groupId = "consumer-group-" + UUID.randomUUID();
         Properties properties = new Properties();
-        properties.put("bootstrap.servers", adminClientConfig.getBootstrapServers());
+        properties.put("bootstrap.servers", kafkaProperties.getBootstrapServers());
         properties.put("group.id", groupId); // 每个 WebSocket 客户端使用一个独立的消费组 ID
         properties.put("key.deserializer", StringDeserializer.class.getName());
         properties.put("value.deserializer", StringDeserializer.class.getName());
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(properties);
-        consumer.subscribe(Arrays.asList(topicName));
+        consumer.subscribe(Collections.singletonList(topicName));
         // 启动新的线程消费消息
         executorService.submit(() -> {
             try {

@@ -1,9 +1,8 @@
 package com.lcc.kafkaUI.service.impl;
 
-import com.alibaba.fastjson.JSON;
 import com.lcc.kafkaUI.common.utils.DateUtils;
-import com.lcc.kafkaUI.config.AdminClientConfig;
-import com.lcc.kafkaUI.entity.Topic;
+import com.lcc.kafkaUI.common.utils.JsonUtils;
+import com.lcc.kafkaUI.config.KafkaProperties;
 import com.lcc.kafkaUI.service.DashboardService;
 import com.lcc.kafkaUI.vo.dashborad.BrokerInfo;
 import com.lcc.kafkaUI.vo.dashborad.ClusterInfo;
@@ -28,6 +27,7 @@ import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 
@@ -35,18 +35,14 @@ import java.util.*;
 @Service
 @Slf4j
 public class DashboardServiceImpl implements DashboardService {
-
-    @Autowired
-    private AdminClient adminClient;
-
     @Autowired(required = false)
     private ZooKeeper zooKeeper;
-
     @Autowired
-    private AdminClientConfig adminClientConfig;
+    private AdminClient adminClient;
+    @Autowired
+    private KafkaProperties kafkaProperties;
 
     private static final int SCALE = 3; // 保留的小数位数
-
 
     @Override
     public ClusterInfo getClusterInfo() {
@@ -61,7 +57,7 @@ public class DashboardServiceImpl implements DashboardService {
             result.setId(clusterID);
 
             Node controller = clusterInfo.controller().get();
-            result.setController(controller.host()+":"+controller.port());
+            result.setController(controller.host() + ":" + controller.port());
 
             int brokerCount = clusterInfo.nodes().get().size();
             result.setBrokerCount(brokerCount);
@@ -71,7 +67,7 @@ public class DashboardServiceImpl implements DashboardService {
 
             return result;
 
-        }catch (Exception e){
+        } catch (Exception e) {
             return null;
         }
     }
@@ -82,7 +78,7 @@ public class DashboardServiceImpl implements DashboardService {
         List<BrokerInfo> result = new ArrayList<>();
 
         try {
-            if(zooKeeper!=null) {
+            if (zooKeeper != null) {
                 // 获取所有Broker ID
                 List<String> brokerIds = zooKeeper.getChildren("/brokers/ids", false);
 
@@ -90,26 +86,26 @@ public class DashboardServiceImpl implements DashboardService {
                 for (String brokerId : brokerIds) {
 
                     byte[] data = zooKeeper.getData("/brokers/ids/" + brokerId, false, new Stat());
-                    String brokerInfoStr = new String(data, "UTF-8");
+                    String brokerInfoStr = new String(data, StandardCharsets.UTF_8);
                     System.out.printf("Broker ID: %s, Info: %s\n", brokerId, brokerInfoStr);
-                    Map map = JSON.parseObject(brokerInfoStr, Map.class);
+                    Map<String, Object> map = JsonUtils.readMap(brokerInfoStr, Object.class);
                     Integer jmx_port = (Integer) map.get("jmx_port");
                     String host = (String) map.get("host");
                     Integer port = (Integer) map.get("port");
                     initBrokerResult(brokerId, host, port, jmx_port, result);
                 }
-            }else{
+            } else {
                 DescribeClusterResult cluster = adminClient.describeCluster();
                 // 获取所有的Broker节点
                 for (Node node : cluster.nodes().get()) {
                     System.out.printf("Broker ID: %d, Host: %s, Port: %d%n", node.id(), node.host(), node.port());
-                    initBrokerResult(String.valueOf(node.id()), node.host(), node.port(),null, result);
+                    initBrokerResult(String.valueOf(node.id()), node.host(), node.port(), null, result);
                 }
             }
 
             //2.连接JMX获取一系列指标
             for (BrokerInfo brokerInfo : result) {
-                if(brokerInfo.getJmxPort()==null){
+                if (brokerInfo.getJmxPort() == null) {
                     log.warn("当前Broker没有开启JMX端口,无法获取指标");
                     continue;
                 }
@@ -129,10 +125,10 @@ public class DashboardServiceImpl implements DashboardService {
                 brokerInfo.setBytesInOneMinRate(oneMinInRate);
                 brokerInfo.setBytesIn5MinRate(fiveMinInRate);
                 brokerInfo.setBytesIn15MinRate(fifteenMinInRate);
-                System.out.println("brokerId:"+brokerInfo.getId()+": 每秒进入的字节平均速率: " + meanInRate + " byte/s");
-                System.out.println("brokerId:"+brokerInfo.getId()+": 最近1分钟进入的字节速率: " + oneMinInRate + " byte/s");
-                System.out.println("brokerId:"+brokerInfo.getId()+": 最近5分钟进入的字节速率: " + fiveMinInRate + " byte/s");
-                System.out.println("brokerId:"+brokerInfo.getId()+": 最近15分钟进入的字节速率: " + fifteenMinInRate + " byte/s");
+                System.out.println("brokerId:" + brokerInfo.getId() + ": 每秒进入的字节平均速率: " + meanInRate + " byte/s");
+                System.out.println("brokerId:" + brokerInfo.getId() + ": 最近1分钟进入的字节速率: " + oneMinInRate + " byte/s");
+                System.out.println("brokerId:" + brokerInfo.getId() + ": 最近5分钟进入的字节速率: " + fiveMinInRate + " byte/s");
+                System.out.println("brokerId:" + brokerInfo.getId() + ": 最近15分钟进入的字节速率: " + fifteenMinInRate + " byte/s");
 
 
                 // 发送的字节数速率
@@ -148,60 +144,60 @@ public class DashboardServiceImpl implements DashboardService {
                 brokerInfo.setBytesOut5MinRate(fiveMinOutRate);
                 brokerInfo.setBytesOut15MinRate(fifteenMinOutRate);
 
-                System.out.println("brokerId:"+brokerInfo.getId()+": 每秒发送的平均速率: " + meanOutRate + " byte/s");
-                System.out.println("brokerId:"+brokerInfo.getId()+": 最近1分钟发送的速率: " + oneMinOutRate + " byte/s");
-                System.out.println("brokerId:"+brokerInfo.getId()+": 最近5分钟发送的速率: " + fiveMinOutRate + " byte/s");
-                System.out.println("brokerId:"+brokerInfo.getId()+": 最近15分钟发送的速率: " + fifteenMinOutRate + " byte/s");
+                System.out.println("brokerId:" + brokerInfo.getId() + ": 每秒发送的平均速率: " + meanOutRate + " byte/s");
+                System.out.println("brokerId:" + brokerInfo.getId() + ": 最近1分钟发送的速率: " + oneMinOutRate + " byte/s");
+                System.out.println("brokerId:" + brokerInfo.getId() + ": 最近5分钟发送的速率: " + fiveMinOutRate + " byte/s");
+                System.out.println("brokerId:" + brokerInfo.getId() + ": 最近15分钟发送的速率: " + fifteenMinOutRate + " byte/s");
 
 
                 // 累计写入消息字节数
                 String messagesInMBean = "kafka.server:type=BrokerTopicMetrics,name=MessagesInPerSec";
                 Long messagesIn = (Long) getAttribute(mBeanServerConnection, messagesInMBean, "Count");
                 brokerInfo.setMessagesInBytes(messagesIn);
-                System.out.println("brokerId:"+brokerInfo.getId()+"累计写入消息字节数: " + messagesIn +" byte");
+                System.out.println("brokerId:" + brokerInfo.getId() + "累计写入消息字节数: " + messagesIn + " byte");
 
                 //分区数
                 String partitionNumMBean = "kafka.server:name=PartitionCount,type=ReplicaManager";
                 Integer partitionNum = (Integer) getAttribute(mBeanServerConnection, partitionNumMBean, "Value");
                 brokerInfo.setPartitionNum(partitionNum);
-                System.out.println("brokerId:"+brokerInfo.getId()+"分区数："+partitionNum);
+                System.out.println("brokerId:" + brokerInfo.getId() + "分区数：" + partitionNum);
 
                 // 获取JVM内存使用情况
                 String jvmMemoryMBean = "java.lang:type=Memory";
-                CompositeData memInfo = (CompositeData) getAttribute(mBeanServerConnection, jvmMemoryMBean,"HeapMemoryUsage");
-                double used = (double) (Long)memInfo.get("used");
-                double committed = (double) (Long)memInfo.get("committed");
-                double a= (used/committed);
+                CompositeData memInfo = (CompositeData) getAttribute(mBeanServerConnection, jvmMemoryMBean, "HeapMemoryUsage");
+                double used = (double) (Long) memInfo.get("used");
+                double committed = (double) (Long) memInfo.get("committed");
+                double a = (used / committed);
                 brokerInfo.setJvmUsedMemory(a);
-                System.out.printf("brokerId:"+brokerInfo.getId()+"JVM 堆内存使用率: %.2f%%\n" , a*100);
+                System.out.printf("brokerId:" + brokerInfo.getId() + "JVM 堆内存使用率: %.2f%%\n", a * 100);
 
                 // 获取JVM线程信息
                 String jvmThreadMBean = "java.lang:type=Threading";
-                Integer threadCount = (Integer) getAttribute(mBeanServerConnection,jvmThreadMBean,"ThreadCount");
+                Integer threadCount = (Integer) getAttribute(mBeanServerConnection, jvmThreadMBean, "ThreadCount");
                 brokerInfo.setJvmThreads(threadCount);
-                System.out.println("brokerId:"+brokerInfo.getId()+"JVM 线程数: " + threadCount);
+                System.out.println("brokerId:" + brokerInfo.getId() + "JVM 线程数: " + threadCount);
 
                 // 获取操作系统信息
                 String osMBean = "java.lang:type=OperatingSystem";
 
                 // 系统CPU使用率（仅在Java 9+中可用）
-                Double systemCpuLoad = (Double) getAttribute(mBeanServerConnection,osMBean, "SystemCpuLoad");
+                Double systemCpuLoad = (Double) getAttribute(mBeanServerConnection, osMBean, "SystemCpuLoad");
                 brokerInfo.setSystemCpuLoad(systemCpuLoad);
 
                 // 进程CPU使用率（仅在Java 9+中可用）
-                Double processCpuLoad = (Double) getAttribute(mBeanServerConnection,osMBean, "ProcessCpuLoad");
+                Double processCpuLoad = (Double) getAttribute(mBeanServerConnection, osMBean, "ProcessCpuLoad");
                 brokerInfo.setProcessCpuLoad(processCpuLoad);
 
-                System.out.printf("brokerId:"+brokerInfo.getId()+"系统CPU使用率: %.2f%%\n", systemCpuLoad * 100);
-                System.out.printf("brokerId:"+brokerInfo.getId()+"进程CPU使用率: %.2f%%\n", processCpuLoad * 100);
+                System.out.printf("brokerId:" + brokerInfo.getId() + "系统CPU使用率: %.2f%%\n", systemCpuLoad * 100);
+                System.out.printf("brokerId:" + brokerInfo.getId() + "进程CPU使用率: %.2f%%\n", processCpuLoad * 100);
 
 
                 // 获取总物理内存大小（字节）
-                Long totalPhysicalMemorySize = (Long) getAttribute(mBeanServerConnection,osMBean, "TotalPhysicalMemorySize");
+                Long totalPhysicalMemorySize = (Long) getAttribute(mBeanServerConnection, osMBean, "TotalPhysicalMemorySize");
                 brokerInfo.setTotalPhysicalMemorySize(totalPhysicalMemorySize);
 
                 // 获取空闲物理内存大小（字节）
-                Long freePhysicalMemorySize = (Long) getAttribute(mBeanServerConnection,osMBean, "FreePhysicalMemorySize");
+                Long freePhysicalMemorySize = (Long) getAttribute(mBeanServerConnection, osMBean, "FreePhysicalMemorySize");
                 brokerInfo.setFreePhysicalMemorySize(freePhysicalMemorySize);
 
                 // 计算已用物理内存
@@ -217,7 +213,7 @@ public class DashboardServiceImpl implements DashboardService {
                 jmxConnector.close();
             }
             return result;
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
             return result;
         }
@@ -237,7 +233,7 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public Map getMessageInfoWithWeek() {
 
-        Map<String,Integer> dataMap = new HashMap<>();
+        Map<String, Integer> dataMap = new HashMap<>();
 
         try {
             //可配置选项
@@ -251,7 +247,7 @@ public class DashboardServiceImpl implements DashboardService {
 
             // 配置 Kafka Consumer
             Properties props = new Properties();
-            props.put("bootstrap.servers", adminClientConfig.getBootstrapServers());
+            props.put("bootstrap.servers", kafkaProperties.getBootstrapServers());
             props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
             props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
             String groupId = "dashboard";
@@ -292,7 +288,6 @@ public class DashboardServiceImpl implements DashboardService {
             Date sevenDaysAgo = calendar.getTime();
 
 
-
             try {
                 while (!allDataFetched) {
                     ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
@@ -306,7 +301,7 @@ public class DashboardServiceImpl implements DashboardService {
                         // 只处理过去七天内的消息
                         if (!recordDate.before(sevenDaysAgo)) {
                             String dateKey = DateUtils.simpleDateFormat2.format(recordDate);
-                            dataMap.put(dateKey,dataMap.get(dateKey)+1);
+                            dataMap.put(dateKey, dataMap.get(dateKey) + 1);
                         }
                     }
 
@@ -320,22 +315,21 @@ public class DashboardServiceImpl implements DashboardService {
                 }
 
 
-
-            }catch (Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
-            }finally {
+            } finally {
                 // 关闭 Consumer
                 consumer.close();
                 try {
                     adminClient.deleteConsumerGroups(Collections.singleton(groupId)).all().get();
                     System.out.println("删除消费者组成功");
-                }catch (Exception e){
+                } catch (Exception e) {
                     e.printStackTrace();
                     System.out.println("删除消费者组失败");
                 }
             }
 
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -345,7 +339,7 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public Map getMessageInfoWithMonth() {
 
-        Map<String,Integer> dataMap = new HashMap<>();
+        Map<String, Integer> dataMap = new HashMap<>();
 
         try {
             //可配置选项
@@ -359,7 +353,7 @@ public class DashboardServiceImpl implements DashboardService {
 
             // 配置 Kafka Consumer
             Properties props = new Properties();
-            props.put("bootstrap.servers",adminClientConfig.getBootstrapServers());
+            props.put("bootstrap.servers", kafkaProperties.getBootstrapServers());
             props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
             props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
             String groupId = "dashboard";
@@ -400,7 +394,6 @@ public class DashboardServiceImpl implements DashboardService {
             Date monthAgo = calendar.getTime();
 
 
-
             try {
                 while (!allDataFetched) {
                     ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
@@ -414,7 +407,7 @@ public class DashboardServiceImpl implements DashboardService {
                         // 只处理过去七天内的消息
                         if (!recordDate.before(monthAgo)) {
                             String dateKey = DateUtils.simpleDateFormat2.format(recordDate);
-                            dataMap.put(dateKey,dataMap.get(dateKey)+1);
+                            dataMap.put(dateKey, dataMap.get(dateKey) + 1);
                         }
                     }
 
@@ -428,22 +421,21 @@ public class DashboardServiceImpl implements DashboardService {
                 }
 
 
-
-            }catch (Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
-            }finally {
+            } finally {
                 // 关闭 Consumer
                 consumer.close();
                 try {
                     adminClient.deleteConsumerGroups(Collections.singleton(groupId)).all().get();
                     System.out.println("删除消费者组成功");
-                }catch (Exception e){
+                } catch (Exception e) {
                     e.printStackTrace();
                     System.out.println("删除消费者组失败");
                 }
             }
 
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -479,10 +471,10 @@ public class DashboardServiceImpl implements DashboardService {
 
                 // 配置 Kafka Consumer
                 Properties props = new Properties();
-                props.put("bootstrap.servers",adminClientConfig.getBootstrapServers());
+                props.put("bootstrap.servers", kafkaProperties.getBootstrapServers());
                 props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
                 props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-                String groupId = UUID.randomUUID().toString().replace("-","");
+                String groupId = UUID.randomUUID().toString().replace("-", "");
                 props.put("group.id", groupId); // 消费组 ID，可任意设置
                 props.put("auto.offset.reset", "earliest"); // 确保从最早的数据开始消费（仅首次生效）
 
@@ -527,7 +519,7 @@ public class DashboardServiceImpl implements DashboardService {
                 try {
                     adminClient.deleteConsumerGroups(Collections.singleton(groupId)).all().get();
                     System.out.println("删除消费者组成功");
-                }catch (Exception e){
+                } catch (Exception e) {
                     e.printStackTrace();
                     System.out.println("删除消费者组失败");
                 }
@@ -546,7 +538,7 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     private JMXConnector connectToKafkaJMX(String host, int port) throws Exception {
-        System.out.println("jmx:"+host+":"+port);
+        System.out.println("jmx:" + host + ":" + port);
         // JMX 服务 URL
         String jmxUrl = String.format("service:jmx:rmi:///jndi/rmi://%s:%d/jmxrmi", host, port);
         JMXServiceURL serviceURL = new JMXServiceURL(jmxUrl);
@@ -558,12 +550,12 @@ public class DashboardServiceImpl implements DashboardService {
 
     public Object getAttribute(MBeanServerConnection connection, String objectName, String attribute) throws Exception {
         ObjectName mbeanName = new ObjectName(objectName);
-        return connection.getAttribute(mbeanName,attribute);
+        return connection.getAttribute(mbeanName, attribute);
     }
 
     private Double round(Object value) {
         if (value instanceof Number) {
-            BigDecimal bd = new BigDecimal(((Number) value).doubleValue());
+            BigDecimal bd = BigDecimal.valueOf(((Number) value).doubleValue());
             bd = bd.setScale(SCALE, RoundingMode.HALF_UP);
             return bd.doubleValue();
         }

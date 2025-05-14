@@ -1,0 +1,14 @@
+server:
+  port: 8093
+
+spring:
+  application:
+    name: kafka-UI
+
+kafka:
+  type: bootstrap_servers
+  bootstrap-servers: localhost:9092
+  zookeeper:
+    host: localhost
+    port: 2181
+    session-timeout: 30s
